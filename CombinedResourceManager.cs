@@ -18,6 +18,7 @@ using Piedone.Combinator.Extensions;
 using Piedone.Combinator.Models;
 using Piedone.Combinator.Services;
 using System.Linq;
+using Orchard;
 using Piedone.HelpfulLibraries.Utilities;
 
 namespace Piedone.Combinator
@@ -33,25 +34,26 @@ namespace Piedone.Combinator
         private readonly ICombinatorService _combinatorService;
         private readonly IShapeTableLocator _shapeTableLocator;
         private readonly IThemeManager _themeManager;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly Lazy<IHttpContextAccessor> _httpContextAccessor;
 
         public ILogger Logger { get; set; }
 
 
         public CombinedResourceManager(
             IEnumerable<Meta<IResourceManifestProvider>> resourceProviders,
+            Lazy<IWorkContextAccessor> wcaLazy,
+            Lazy<IHttpContextAccessor> hcaLazy,
             ISiteService siteService,
             ICombinatorService combinatorService,
             IShapeTableLocator shapeTableLocator,
-            IThemeManager themeManager,
-            IHttpContextAccessor httpContextAccessor)
-            : base(resourceProviders)
+            IThemeManager themeManager)
+            : base(resourceProviders, wcaLazy, hcaLazy)
         {
             _siteService = siteService;
             _combinatorService = combinatorService;
             _shapeTableLocator = shapeTableLocator;
             _themeManager = themeManager;
-            _httpContextAccessor = httpContextAccessor;
+            _httpContextAccessor = hcaLazy;
 
             Logger = NullLogger.Instance;
         }
@@ -65,7 +67,7 @@ namespace Piedone.Combinator
             var settingsPart = _siteService.GetSiteSettings().As<CombinatorSettingsPart>();
 
             if (resources.Count == 0
-                || Orchard.UI.Admin.AdminFilter.IsApplied(_httpContextAccessor.Current().Request.RequestContext) && !settingsPart.EnableForAdmin) return resources;
+                || Orchard.UI.Admin.AdminFilter.IsApplied(_httpContextAccessor.Value.Current().Request.RequestContext) && !settingsPart.EnableForAdmin) return resources;
 
             var resourceType = ResourceTypeHelper.StringTypeToEnum(stringResourceType);
 
@@ -163,7 +165,7 @@ namespace Piedone.Combinator
         {
             var shapeKeyPrefix = resourceType == ResourceType.Style ? "Style__" : "Script__";
 
-            var currentTheme = _themeManager.GetRequestTheme(_httpContextAccessor.Current().Request.RequestContext);
+            var currentTheme = _themeManager.GetRequestTheme(_httpContextAccessor.Value.Current().Request.RequestContext);
             var shapeTable = _shapeTableLocator.Lookup(currentTheme.Id);
 
             foreach (var resource in resources)
